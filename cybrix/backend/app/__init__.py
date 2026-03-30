@@ -1,0 +1,1 @@
+"""CYBRIX backend application package."""
