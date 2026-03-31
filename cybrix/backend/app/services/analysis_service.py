@@ -7,6 +7,28 @@ class AnalysisService:
     """Service layer for rule-based analysis behavior."""
 
     SUSPICIOUS_KEYWORDS = ("login", "verify", "secure", "account", "bank")
+    MESSAGE_RULES = (
+        (
+            ("urgent", "immediately", "now", "action required"),
+            25,
+            "Urgency language detected",
+        ),
+        (
+            ("bank", "account", "payment", "credit card"),
+            20,
+            "Financial terms detected",
+        ),
+        (
+            ("click here", "verify now", "login now", "claim reward"),
+            25,
+            "Suspicious call-to-action detected",
+        ),
+        (
+            ("account blocked", "legal action", "suspended"),
+            20,
+            "Threat or fear-based language detected",
+        ),
+    )
 
     def analyze_link(self, url: str) -> AnalysisResponse:
         """Analyze a URL using simple deterministic rules."""
@@ -49,12 +71,35 @@ class AnalysisService:
             action=action,
         )
 
-    def analyze_message(self, _: str) -> AnalysisResponse:
-        return AnalysisResponse(
-            risk=0,
-            reason=["Not implemented yet"],
-            action="Pending analysis",
-        )
+    def analyze_message(self, message: str) -> AnalysisResponse:
+        """Analyze a message using deterministic phishing and scam rules."""
+        normalized_message = message.strip()
+        lowered_message = normalized_message.lower()
+        reasons: list[str] = []
+        risk = 0
+
+        for keywords, score, category in self.MESSAGE_RULES:
+            matches = self._find_keyword_matches(lowered_message, keywords)
+            if matches:
+                risk += score
+                joined_matches = ", ".join(matches)
+                reasons.append(f"{category}: {joined_matches}.")
+
+        if "http" in lowered_message:
+            risk += 15
+            reasons.append("A link was detected in the message, which is commonly used in phishing attempts.")
+
+        risk = min(risk, 100)
+
+        if risk >= 60:
+            action = "High Risk"
+        elif risk > 0:
+            action = "Suspicious"
+        else:
+            action = "Safe"
+            reasons.append("No common phishing or scam patterns were detected.")
+
+        return AnalysisResponse(risk=risk, reason=reasons, action=action)
 
     def _parse_url(self, url: str):
         """Parse URLs safely and support inputs without an explicit scheme."""
@@ -62,3 +107,7 @@ class AnalysisService:
         if parsed_url.scheme or parsed_url.netloc:
             return parsed_url
         return urlparse(f"https://{url}")
+
+    def _find_keyword_matches(self, text: str, keywords: tuple[str, ...]) -> list[str]:
+        """Return the matched keywords for a rule without duplicating entries."""
+        return [keyword for keyword in keywords if keyword in text]

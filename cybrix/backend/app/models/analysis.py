@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 
 
 class MessageAnalysisRequest(BaseModel):
-    content: str = Field(..., min_length=1, description="Text or URL to analyze.")
+    message: str = Field(..., min_length=1, description="Message content to analyze.")
 
 
 class LinkAnalysisRequest(BaseModel):
